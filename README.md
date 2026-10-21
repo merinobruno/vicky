@@ -23,6 +23,8 @@ The bundled artwork was created with the built-in ImageGen tool using this brief
 
 ## Interaction details
 
-No evades mouse proximity, touch presses, and Enter/Space. A pointer gesture that starts on No cannot accept. Related pointer/click events count once. The button uses measured protected regions and a bounded safe-position search; extremely cramped viewports get a separate escape strip with the page scrollable above it. Yes growth and particles are capped. Reduced-motion preferences remove decorative motion and simplify confetti. A real “Open Discord now” link remains available during the celebration.
+No evades mouse proximity, touch presses, and Enter/Space. Related pointer/click events count once. Every escape makes Yes dramatically larger; on the sixth escape, Yes fills the viewport and completely covers No. Until then, No finds a safe spot in the remaining space. The gesture that causes the takeover never accepts: click Yes deliberately, or press Tab and then Enter/Space. Covered page controls are removed from keyboard navigation until acceptance. Configure growth and the takeover threshold with `CHAOS.yesGrowth` and `CHAOS.takeoverAt` in `game.mjs`.
+
+Reduced-motion preferences make growth and repositioning instant and simplify confetti. Particle counts remain capped. Accepting restores the readable confirmation and its real “Open Discord now” link before the same-tab redirect.
 
 The site has no analytics, API keys, runtime dependencies, or audio. The deployable folder includes only website files and bundled artwork. Tests cover gesture deduplication, keyboard input, acceptance guard, escalation, redirect configuration, and viewport collision handling. Visual browser checks complement the automated state tests.

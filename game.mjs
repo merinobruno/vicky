@@ -1,5 +1,5 @@
 export const DISCORD_INVITE_URL = 'https://discord.gg/hXT6Euajp';
-export const CHAOS = Object.freeze({ cooldown: 480, travelDuration: 340, landingPause: 120, redirectDelay: 2500, maxYesScale: 1.22, maxParticles: 620, mobileParticles: 280 });
+export const CHAOS = Object.freeze({ cooldown: 480, travelDuration: 340, landingPause: 120, redirectDelay: 2500, yesGrowth: 1.65, takeoverAt: 6, maxParticles: 620, mobileParticles: 280 });
 export const TAUNTS = [
   'Oops. Slippery button.',
   'Were you aiming for the other one?',
@@ -30,17 +30,21 @@ export class InvitationState {
   lastKeyboard = -Infinity;
   pointerOrigin = null;
   pointerCounted = false;
+  keyboardOrigin = null;
+  noCovered = false;
   attemptsBlockedUntil = -Infinity;
   pauseAttemptsUntil(time) { this.attemptsBlockedUntil = time; }
   attempt(time, bypassCooldown = false) {
-    if (this.accepted || time < this.attemptsBlockedUntil || (!bypassCooldown && time - this.lastAttempt < CHAOS.cooldown)) return false;
+    if (this.accepted || this.noCovered || time < this.attemptsBlockedUntil || (!bypassCooldown && time - this.lastAttempt < CHAOS.cooldown)) return false;
     this.attempts++;
+    this.noCovered = this.attempts >= CHAOS.takeoverAt;
     this.lastAttempt = time;
     return true;
   }
   pointerDown(target, time) {
     this.pointerOrigin = target;
     this.pointerCounted = target === 'no';
+    if (target === 'no' || target === 'yes') this.keyboardOrigin = target;
     return target === 'no' && this.attempt(time);
   }
   noClick(time, detail = 1) {
@@ -48,16 +52,32 @@ export class InvitationState {
     return this.attempt(time);
   }
   noKey(key, repeat, time) {
-    if (!['Enter', ' '].includes(key) || repeat || this.accepted) return false;
+    if (!['Enter', ' '].includes(key) || repeat || this.accepted || this.noCovered) return false;
+    this.keyboardOrigin = 'no';
     this.lastKeyboard = time;
     return this.attempt(time, true);
   }
+  focusYes() { this.keyboardOrigin = 'yes'; }
   accept(detail = 0) {
-    if (this.accepted || (detail > 0 && this.pointerOrigin !== 'yes')) return false;
+    if (this.accepted || (detail > 0 && this.pointerOrigin !== 'yes') || (detail === 0 && this.keyboardOrigin === 'no')) return false;
     this.accepted = true;
     this.pointerOrigin = null;
     return true;
   }
+}
+export function yesRectFor({ attempts, viewport, initial }) {
+  if (attempts >= CHAOS.takeoverAt) return { ...viewport, full: true };
+  const scale = CHAOS.yesGrowth ** Math.max(0, attempts);
+  const width = Math.min(viewport.width * Math.min(1, .45 + attempts * .11), initial.width * scale);
+  const height = Math.min(Math.max(1, viewport.height - 120), initial.height * scale);
+  const progress = Math.min(1, attempts / 4);
+  const centerX = (initial.x + initial.width / 2) * (1 - progress) + (viewport.x + viewport.width / 2) * progress;
+  const centerY = (initial.y + initial.height / 2) * (1 - progress) + (viewport.y + viewport.height / 2) * progress;
+  return {
+    x: Math.max(viewport.x, Math.min(viewport.x + viewport.width - width, centerX - width / 2)),
+    y: Math.max(viewport.y, Math.min(viewport.y + viewport.height - height - 120, centerY - height / 2)),
+    width, height, full: false
+  };
 }
 export function overlaps(a, b, gap = 0) { return a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y; }
 export function pickPosition({ viewport, size, obstacles = [], pathObstacles = [], pointer, previous, preferPrevious = false, random = Math.random, margin = 16 }) {

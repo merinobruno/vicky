@@ -1,4 +1,4 @@
-import { CHAOS, DISCORD_INVITE_URL, InvitationState, pickPosition, stageFor, tauntFor } from './game.mjs';
+import { CHAOS, DISCORD_INVITE_URL, InvitationState, pickPosition, stageFor, tauntFor, yesRectFor } from './game.mjs';
 
 const $ = id => document.getElementById(id);
 const state = new InvitationState();
@@ -11,6 +11,10 @@ let lastPointer = null;
 let resizeFrame = 0;
 let animationFrame = 0;
 let noTravel = null;
+let initialYesRect = null;
+let grownYesRect = null;
+let yesPlaceholder = null;
+let takeoverFocus = null;
 let clearConfetti = () => {};
 const on = (target, type, listener, options = {}) => target.addEventListener(type, listener, { ...options, signal: lifetime.signal });
 const later = (fn, delay) => { const id = setTimeout(() => { timers.delete(id); fn(); }, delay); timers.add(id); return id; };
@@ -36,8 +40,53 @@ function usableViewport() {
   };
 }
 
-function moveNo(pointer = lastPointer, { animate = true, from = rect(no), preservePosition = false } = {}) {
+function pageViewport() {
+  const viewport = window.visualViewport;
+  return { x: viewport?.offsetLeft || 0, y: viewport?.offsetTop || 0, width: viewport?.width || innerWidth, height: viewport?.height || innerHeight };
+}
+
+function growYes({ instant = false } = {}) {
   if (state.accepted) return;
+  const current = rect(yes);
+  if (!initialYesRect) {
+    document.body.classList.remove('escape-docked');
+    initialYesRect = current;
+    yesPlaceholder = document.createElement('span');
+    yesPlaceholder.className = 'yes-placeholder';
+    yesPlaceholder.setAttribute('aria-hidden', 'true');
+    Object.assign(yesPlaceholder.style, { width: `${current.width}px`, height: `${current.height}px` });
+    yes.before(yesPlaceholder);
+    takeoverFocus = document.createElement('span');
+    takeoverFocus.className = 'takeover-focus';
+    takeoverFocus.tabIndex = -1;
+    document.body.append(takeoverFocus, yes);
+    Object.assign(yes.style, { left: `${current.x}px`, top: `${current.y}px`, width: `${current.width}px`, height: `${current.height}px` });
+    yes.classList.add('is-expanded');
+    void yes.offsetWidth;
+  }
+  grownYesRect = yesRectFor({ attempts: state.attempts, viewport: pageViewport(), initial: initialYesRect });
+  yes.classList.toggle('is-instant', instant);
+  yes.classList.toggle('is-total', grownYesRect.full);
+  const fontSize = Math.min(150, Math.max(25, Math.min(grownYesRect.width * .22, grownYesRect.height * .34)));
+  Object.assign(yes.style, { left: `${grownYesRect.x}px`, top: `${grownYesRect.y}px`, width: `${grownYesRect.width}px`, height: `${grownYesRect.height}px`, fontSize: `${fontSize}px` });
+  if (grownYesRect.full) {
+    if (noTravel) { noTravel.cancel(); noTravel = null; }
+    no.disabled = true;
+    no.tabIndex = -1;
+    no.setAttribute('aria-hidden', 'true');
+    if (!document.body.classList.contains('yes-takeover')) {
+      // Keep the originating No keypress away from Yes. The next Tab is intentional.
+      takeoverFocus.textContent = 'Yes has taken over! Press Tab to choose Yes.';
+      takeoverFocus.focus({ preventScroll: true });
+    }
+    document.querySelector('.page-shell').inert = true;
+    document.body.classList.add('yes-takeover');
+  }
+  return { previous: current, target: grownYesRect };
+}
+
+function moveNo(pointer = lastPointer, { animate = true, from = rect(no), preservePosition = false, previousYes = rect(yes) } = {}) {
+  if (state.accepted || state.noCovered) return;
   const previous = from;
   if (noTravel) { noTravel.cancel(); noTravel = null; }
   no.classList.remove('is-moving', 'just-landed');
@@ -46,10 +95,10 @@ function moveNo(pointer = lastPointer, { animate = true, from = rect(no), preser
   no.style.setProperty('--no-y', `${previous.y}px`);
   no.classList.add('is-loose');
   const viewport = usableViewport();
-  const obstacles = [yes, $('question'), $('face-zone'), document.querySelector('.site-header'), $('speech'), $('discord-link')]
+  const obstacles = grownYesRect ? [grownYesRect] : [yes, $('question'), $('face-zone'), document.querySelector('.site-header'), $('speech'), $('discord-link')]
     .filter(element => !element.hidden).map(rect);
   let size = { width: no.offsetWidth, height: no.offsetHeight };
-  const pathObstacles = animate && !reducedMotion.matches ? [rect(yes)] : [];
+  const pathObstacles = animate && !reducedMotion.matches ? [previousYes] : [];
   let position = pickPosition({ viewport, size, obstacles, pathObstacles, pointer, previous, preferPrevious: preservePosition });
   if (!position) {
     no.textContent = 'No';
@@ -57,7 +106,12 @@ function moveNo(pointer = lastPointer, { animate = true, from = rect(no), preser
     size = { width: no.offsetWidth, height: no.offsetHeight };
     position = pickPosition({ viewport, size, obstacles, pathObstacles, pointer, previous, preferPrevious: preservePosition });
   }
+  if (!position && grownYesRect) {
+    // Growth can enclose the starting point: escape behind Yes to a safe endpoint.
+    position = pickPosition({ viewport, size, obstacles, pointer, previous, preferPrevious: preservePosition });
+  }
   if (!position || document.body.classList.contains('escape-docked')) {
+    if (grownYesRect) return;
     // Extremely short viewports get a dedicated strip; the page remains scrollable above it.
     document.body.classList.add('escape-docked');
     position = { x: viewport.x + 16 + Math.random() * Math.max(0, viewport.width - size.width - 32), y: viewport.y + viewport.height - size.height - 16 };
@@ -117,20 +171,18 @@ function renderAttempt() {
   $('attempt-count').textContent = `Failed escape attempts: ${state.attempts}`;
   $('resistance').textContent = `RESISTANCE ${state.attempts > 12 ? state.attempts * 39 : Math.min(99, state.attempts * 8)}%`;
   $('resistance-fill').style.width = `${Math.min(100, state.attempts * 8)}%`;
-  document.documentElement.style.setProperty('--yes-scale', Math.min(CHAOS.maxYesScale, 1 + state.attempts * .019));
   const speeches = ['hey, you! ♡', 'excuse me?! ♡', 'oh, we’re doing this?', 'I make the rules. ♡', 'The No department is closed.'];
   $('speech').textContent = speeches[stage];
   no.textContent = stage >= 3 ? ['Nice try', 'Absolutely maybe', 'No.exe stopped responding', 'No'][state.attempts % 4] : 'No';
   no.classList.toggle('is-error', stage === 4 && state.attempts % 3 === 1);
   no.setAttribute('aria-label', `${no.textContent}. Try to decline the invitation`);
   makeEffects(previous);
-  moveNo(lastPointer, { from: previous });
+  const growth = growYes();
+  moveNo(lastPointer, { from: previous, previousYes: growth.previous });
   const scene = $('character-scene');
   scene.classList.remove('react');
-  yes.classList.remove('pulse');
   void scene.offsetWidth;
   scene.classList.add('react');
-  yes.classList.add('pulse');
   if (state.attempts === 8 || state.attempts === 13 || state.attempts % 10 === 0) {
     $('takeover').classList.add('show');
     later(() => $('takeover').classList.remove('show'), 1500);
@@ -139,7 +191,7 @@ function renderAttempt() {
 
 function attempt(time = performance.now()) { if (state.attempt(time)) renderAttempt(); }
 on(document, 'pointermove', event => {
-  if (state.accepted || event.pointerType !== 'mouse') return;
+  if (state.accepted || state.noCovered || event.pointerType !== 'mouse') return;
   lastPointer = { x: event.clientX, y: event.clientY };
   const button = no.getBoundingClientRect();
   const dx = Math.max(button.left - event.clientX, 0, event.clientX - button.right);
@@ -163,14 +215,20 @@ on(no, 'keydown', event => {
   if (state.noKey(event.key, event.repeat, performance.now())) renderAttempt();
 });
 on(no, 'keyup', event => { if (['Enter', ' '].includes(event.key)) event.preventDefault(); });
+on(yes, 'focus', () => state.focusYes());
+on(yes, 'keydown', event => { if (['Enter', ' '].includes(event.key) && !event.repeat) state.focusYes(); });
 on(yes, 'click', event => {
   if (!state.accept(event.detail)) return;
   celebrate();
 });
 
 function scheduleReposition() {
-  if (!no.classList.contains('is-loose') || state.accepted || resizeFrame) return;
-  resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; moveNo(null, { animate: false, preservePosition: true }); });
+  if (!initialYesRect || state.accepted || resizeFrame) return;
+  resizeFrame = requestAnimationFrame(() => {
+    resizeFrame = 0;
+    growYes({ instant: true });
+    moveNo(null, { animate: false, preservePosition: true });
+  });
 }
 on(window, 'resize', scheduleReposition);
 on(window, 'orientationchange', scheduleReposition);
@@ -234,6 +292,12 @@ function celebrate() {
   if (noTravel) { noTravel.cancel(); noTravel = null; }
   document.body.classList.add('accepted');
   document.body.dataset.accepted = 'true';
+  yes.hidden = true;
+  document.querySelector('.page-shell').inert = false;
+  document.body.classList.remove('yes-takeover');
+  if (yesPlaceholder) yesPlaceholder.replaceWith(yes);
+  if (takeoverFocus) takeoverFocus.remove();
+  no.hidden = true;
   $('actions').hidden = true;
   $('attempt-info').hidden = true;
   $('takeover').classList.remove('show');
@@ -245,6 +309,8 @@ function celebrate() {
   $('reaction-text').textContent = 'Friendship achieved. See you in the lobby!';
   $('discord-link').hidden = false;
   $('discord-link').focus({ preventScroll: true });
+  const questionBounds = $('question').getBoundingClientRect();
+  if (questionBounds.top < 0 || questionBounds.bottom > innerHeight) $('question').scrollIntoView({ block: 'center', behavior: 'instant' });
   confetti();
   later(() => { window.location.assign(DISCORD_INVITE_URL); }, CHAOS.redirectDelay);
 }
