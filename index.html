@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#09151c">
+  <meta name="description" content="Player 2 required. A very serious, extremely Miku-approved invitation to play.">
+  <title>Wanna play? ♡ — Miku's Playroom</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preload" as="image" href="assets/miku.webp">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <div class="ambient ambient--mint" aria-hidden="true"></div><div class="ambient ambient--pink" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Miku's Playroom home"><span class="brand-symbol">m<span>✦</span></span><span>MIKU<span class="brand-divider">/</span>PLAYROOM<span class="brand-dot">.</span></span></a>
+      <span class="online"><span></span> LOBBY ONLINE <b>01 / 02</b></span>
+    </header>
+    <main>
+      <div class="overline"><span class="overline-line"></span> A LITTLE INVITATION, A LOT OF MIKU <span class="overline-star">✦</span></div>
+      <section class="invitation" aria-labelledby="question">
+        <div class="card-grid" aria-hidden="true"></div>
+        <div class="ticket-top"><span><i></i> MULTIPLAYER MODE</span><span class="ticket-id">INVITE № 0039 <span>↗</span></span></div>
+        <div class="invitation-content">
+          <div class="invitation-copy">
+            <div class="player-tag"><span class="tiny-star">✦</span><span id="player-label">PLAYER 2 REQUIRED</span></div>
+            <h1 id="question">Do you wanna <br><span>play with me?</span><svg class="question-spark" viewBox="0 0 38 44" aria-hidden="true"><path d="M19 0 23 15 38 22 23 27 19 44 14 28 0 22 14 16Z" fill="currentColor"/></svg></h1>
+            <p class="subtitle" id="subtitle">The lobby is waiting.<br class="mobile-break"> So is Miku. <span>♡</span></p>
+            <div class="actions" id="actions">
+              <button class="yes-button" id="yes-button" type="button"><span class="button-controller" aria-hidden="true">✚</span><span>Yes</span><span class="button-arrow" aria-hidden="true">↗</span></button>
+              <div class="no-slot"><button class="no-button" id="no-button" type="button">No</button></div>
+            </div>
+            <a id="discord-link" class="discord-link" hidden>Open Discord now <span aria-hidden="true">↗</span></a>
+            <div class="reaction" aria-live="polite" aria-atomic="true"><span class="reaction-star" aria-hidden="true">✧</span><p id="reaction-text">Good games are better together.</p></div>
+            <div class="attempt-info" id="attempt-info" hidden><span id="attempt-count">Failed escape attempts: 0</span><span id="resistance">RESISTANCE 0%</span><div class="resistance-track"><i id="resistance-fill"></i></div></div>
+          </div>
+          <div class="character-scene" id="character-scene">
+            <div class="orbit orbit--one" aria-hidden="true"></div><div class="orbit orbit--two" aria-hidden="true"></div>
+            <span class="character-number" aria-hidden="true">01</span>
+            <span class="decor decor--star" aria-hidden="true">✦</span><span class="decor decor--note" aria-hidden="true">♫</span><span class="decor decor--heart" aria-hidden="true">♡</span><span class="decor decor--plus" aria-hidden="true">+</span>
+            <div class="speech" id="speech">hey, you! <span>♡</span></div>
+            <img class="miku" id="miku" src="assets/miku.webp" alt="Hatsune Miku with turquoise twin-tails, smiling and inviting you to play" width="1024" height="1536" fetchpriority="high">
+            <div class="face-zone" id="face-zone" aria-hidden="true"></div>
+            <div class="miku-label"><span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span>HATSUNE MIKU</span><span class="label-heart">♡</span></div>
+            <span class="tiny-caption">YOUR CO-OP PARTNER IS READY.</span>
+          </div>
+        </div>
+        <div class="ticket-bottom"><span><span class="small-heart">♡</span> ONE INVITE. INFINITE POSSIBILITIES.</span><span class="connection"><span></span> CONNECTION: DESTINED</span></div>
+        <div class="takeover" id="takeover" aria-hidden="true">✦ MIKU TAKEOVER ✦</div>
+      </section>
+      <div class="below-card"><span class="tiny-equalizer" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><p>Finding your player 2 is the real endgame.</p><span class="mini-leek" aria-hidden="true">✳</span></div>
+    </main>
+    <footer class="site-footer"><span>A very serious invitation.</span><span>MADE WITH <span class="footer-heart">♡</span> & QUESTIONABLE AMOUNTS OF TEAL</span><span class="footer-code">39 / THANK YOU</span></footer>
+  </div>
+  <div class="safe-area-probe" id="safe-area-probe" aria-hidden="true"></div>
+  <div id="effects" class="effects" aria-hidden="true"></div>
+  <canvas id="confetti" aria-hidden="true"></canvas>
+</body>
+</html>
