@@ -1,5 +1,5 @@
 export const DISCORD_INVITE_URL = 'https://discord.gg/hXT6Euajp';
-export const CHAOS = Object.freeze({ cooldown: 480, travelDuration: 340, landingPause: 120, redirectDelay: 2500, yesGrowth: 1.65, takeoverAt: 6, maxParticles: 620, mobileParticles: 280 });
+export const CHAOS = Object.freeze({ cooldown: 480, travelDuration: 340, landingPause: 120, redirectDelay: 2500, yesGrowth: 1.65, takeoverAt: 20, maxParticles: 620, mobileParticles: 280 });
 export const TAUNTS = [
   'Oops. Slippery button.',
   'Were you aiming for the other one?',
@@ -67,10 +67,12 @@ export class InvitationState {
 }
 export function yesRectFor({ attempts, viewport, initial }) {
   if (attempts >= CHAOS.takeoverAt) return { ...viewport, full: true };
-  const scale = CHAOS.yesGrowth ** Math.max(0, attempts);
-  const width = Math.min(viewport.width * Math.min(1, .45 + attempts * .11), initial.width * scale);
+  // Spread the growth curve, width expansion, and centering across the whole game.
+  const growthProgress = Math.max(0, attempts) / Math.max(1, CHAOS.takeoverAt - 1);
+  const scale = CHAOS.yesGrowth ** (growthProgress * 5);
+  const width = Math.min(viewport.width * Math.min(1, .45 + growthProgress * .55), initial.width * scale);
   const height = Math.min(Math.max(1, viewport.height - 120), initial.height * scale);
-  const progress = Math.min(1, attempts / 4);
+  const progress = Math.min(1, growthProgress * 1.25);
   const centerX = (initial.x + initial.width / 2) * (1 - progress) + (viewport.x + viewport.width / 2) * progress;
   const centerY = (initial.y + initial.height / 2) * (1 - progress) + (viewport.y + viewport.height / 2) * progress;
   return {

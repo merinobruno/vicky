@@ -23,7 +23,7 @@ The bundled artwork was created with the built-in ImageGen tool using this brief
 
 ## Interaction details
 
-No evades mouse proximity, touch presses, and Enter/Space. Related pointer/click events count once. Every escape makes Yes dramatically larger; on the sixth escape, Yes fills the viewport and completely covers No. Until then, No finds a safe spot in the remaining space. The gesture that causes the takeover never accepts: click Yes deliberately, or press Tab and then Enter/Space. Covered page controls are removed from keyboard navigation until acceptance. Configure growth and the takeover threshold with `CHAOS.yesGrowth` and `CHAOS.takeoverAt` in `game.mjs`.
+No evades mouse proximity, touch presses, and Enter/Space. Related pointer/click events count once. Every escape makes Yes larger, with growth paced across 20 escapes so there is more time to play. On the twentieth escape, Yes fills the viewport and completely covers No. Until then, No finds a safe spot in the remaining space. The gesture that causes the takeover never accepts: click Yes deliberately, or press Tab and then Enter/Space. Covered page controls are removed from keyboard navigation until acceptance. Configure growth and the takeover threshold with `CHAOS.yesGrowth` and `CHAOS.takeoverAt` in `game.mjs`; growth, width expansion, and centering adapt to that threshold.
 
 Reduced-motion preferences make growth and repositioning instant and simplify confetti. Particle counts remain capped. Accepting restores the readable confirmation and its real “Open Discord now” link before the same-tab redirect.
 

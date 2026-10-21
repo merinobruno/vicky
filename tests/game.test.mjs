@@ -59,7 +59,7 @@ test('chaos escalates at the defined boundaries', () => {
   assert.deepEqual([0, 1, 3, 4, 7, 8, 12, 13, 1000].map(stageFor), [0, 1, 1, 2, 2, 3, 3, 4, 4]);
   assert.equal(tauntFor(1), 'Oops. Slippery button.');
   assert.ok(tauntFor(1000).length > 0);
-  assert.equal(CHAOS.takeoverAt, 6);
+  assert.equal(CHAOS.takeoverAt, 20);
 });
 test('escape positions stay inside narrow viewport and avoid protected content', () => {
   const viewport = { x: 0, y: 0, width: 320, height: 568 };
@@ -121,7 +121,7 @@ test('scroll and resize corrections retain an already safe visible position', ()
   assert.deepEqual(pickPosition({ viewport: { x: 0, y: 0, width: 700, height: 600 }, size: { width: 85, height: 52 }, previous, preferPrevious: true }), previous);
 });
 
-test('Yes grows dramatically on each escape and covers the complete viewport on six', () => {
+test('Yes grows on every escape and covers the complete viewport only on twenty', () => {
   for (const viewport of [{ x: 0, y: 0, width: 1440, height: 800 }, { x: 0, y: 0, width: 320, height: 568 }, { x: 14, y: 21, width: 800, height: 320 }]) {
     const initial = { x: 80, y: 250, width: 140, height: 54 };
     let previousArea = initial.width * initial.height;
@@ -131,11 +131,17 @@ test('Yes grows dramatically on each escape and covers the complete viewport on 
       assert.ok(result.x >= viewport.x && result.y >= viewport.y);
       assert.ok(result.x + result.width <= viewport.x + viewport.width + .001);
       assert.ok(result.y + result.height <= viewport.y + viewport.height + .001);
-      if (attempts < CHAOS.takeoverAt) assert.ok(result.y + result.height <= viewport.y + viewport.height - 100 + .001);
+      if (attempts < CHAOS.takeoverAt) {
+        assert.equal(result.full, false);
+        assert.ok(result.y + result.height <= viewport.y + viewport.height - 100 + .001);
+      }
       else assert.deepEqual(result, { ...viewport, full: true });
       previousArea = result.width * result.height;
     }
-    assert.ok(yesRectFor({ attempts: 1, viewport, initial }).width * yesRectFor({ attempts: 1, viewport, initial }).height > initial.width * initial.height * 2);
+    const first = yesRectFor({ attempts: 1, viewport, initial });
+    assert.ok(first.width * first.height < initial.width * initial.height * 2);
+    const sixth = yesRectFor({ attempts: 6, viewport, initial });
+    assert.ok(sixth.width * sixth.height < viewport.width * viewport.height * .3);
   }
 });
 
@@ -153,24 +159,32 @@ test('No retains a safe endpoint outside the growing Yes until takeover', () => 
 
 test('the final No pointer gesture cannot accept the covering Yes', () => {
   const state = new InvitationState();
-  for (let n = 1; n <= CHAOS.takeoverAt; n++) assert.equal(state.pointerDown('no', n * 1000), true);
+  for (let n = 1; n <= CHAOS.takeoverAt; n++) {
+    assert.equal(state.pointerDown('no', n * 1000), true);
+    assert.equal(state.noCovered, n === CHAOS.takeoverAt);
+  }
+  const takeoverTime = CHAOS.takeoverAt * 1000;
   assert.equal(state.noCovered, true);
   assert.equal(state.accept(1), false);
   assert.equal(state.accept(0), false);
-  assert.equal(state.attempt(8000), false);
+  assert.equal(state.attempt(takeoverTime + 2000), false);
   assert.equal(state.accepted, false);
-  state.pointerDown('yes', 9000);
+  state.pointerDown('yes', takeoverTime + 3000);
   assert.equal(state.accept(1), true);
 });
 
 test('final No Enter or Space never accepts without a new intentional Yes focus', () => {
   for (const key of ['Enter', ' ']) {
     const state = new InvitationState();
-    for (let n = 1; n <= CHAOS.takeoverAt; n++) assert.equal(state.noKey(key, false, n * 1000), true);
+    for (let n = 1; n <= CHAOS.takeoverAt; n++) {
+      assert.equal(state.noKey(key, false, n * 1000), true);
+      assert.equal(state.noCovered, n === CHAOS.takeoverAt);
+    }
+    const takeoverTime = CHAOS.takeoverAt * 1000;
     assert.equal(state.noCovered, true);
-    assert.equal(state.noKey(key, true, 6100), false);
+    assert.equal(state.noKey(key, true, takeoverTime + 100), false);
     assert.equal(state.accept(0), false);
-    assert.equal(state.noClick(6200, 0), false);
+    assert.equal(state.noClick(takeoverTime + 200, 0), false);
     assert.equal(state.accepted, false);
     state.focusYes();
     assert.equal(state.accept(0), true);
