@@ -1,5 +1,5 @@
 export const DISCORD_INVITE_URL = 'https://discord.gg/hXT6Euajp';
-export const CHAOS = Object.freeze({ cooldown: 480, redirectDelay: 2500, maxYesScale: 1.22, maxParticles: 620, mobileParticles: 280 });
+export const CHAOS = Object.freeze({ cooldown: 480, travelDuration: 340, landingPause: 120, redirectDelay: 2500, maxYesScale: 1.22, maxParticles: 620, mobileParticles: 280 });
 export const TAUNTS = [
   'Oops. Slippery button.',
   'Were you aiming for the other one?',
@@ -30,8 +30,10 @@ export class InvitationState {
   lastKeyboard = -Infinity;
   pointerOrigin = null;
   pointerCounted = false;
+  attemptsBlockedUntil = -Infinity;
+  pauseAttemptsUntil(time) { this.attemptsBlockedUntil = time; }
   attempt(time, bypassCooldown = false) {
-    if (this.accepted || (!bypassCooldown && time - this.lastAttempt < CHAOS.cooldown)) return false;
+    if (this.accepted || time < this.attemptsBlockedUntil || (!bypassCooldown && time - this.lastAttempt < CHAOS.cooldown)) return false;
     this.attempts++;
     this.lastAttempt = time;
     return true;
@@ -58,28 +60,38 @@ export class InvitationState {
   }
 }
 export function overlaps(a, b, gap = 0) { return a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y; }
-export function pickPosition({ viewport, size, obstacles = [], pointer, previous, random = Math.random, margin = 16 }) {
+export function pickPosition({ viewport, size, obstacles = [], pathObstacles = [], pointer, previous, preferPrevious = false, random = Math.random, margin = 16 }) {
   const left = viewport.x + margin;
   const top = viewport.y + margin;
   const maxX = Math.max(left, viewport.x + viewport.width - size.width - margin);
   const maxY = Math.max(top, viewport.y + viewport.height - size.height - margin);
+  const escapeDistance = Math.min(480, Math.max(180, Math.min(viewport.width, viewport.height) * .8));
+  if (preferPrevious && previous && previous.x >= left && previous.x <= maxX && previous.y >= top && previous.y <= maxY && obstacles.every(obstacle => !overlaps({ ...previous, ...size }, obstacle, 12))) {
+    return { x: previous.x, y: previous.y };
+  }
   const candidates = [];
   const add = (x, y) => candidates.push({ x: Math.max(left, Math.min(maxX, x)), y: Math.max(top, Math.min(maxY, y)), ...size });
   // Random escapes plus a bounded grid guarantee a deterministic fallback.
   for (let n = 0; n < 36; n++) add(left + random() * (maxX - left), top + random() * (maxY - top));
   for (let y = 0; y <= 8; y++) for (let x = 0; x <= 8; x++) add(left + (maxX - left) * x / 8, top + (maxY - top) * y / 8);
   if (previous) {
-    add(previous.x + 140, previous.y + 65);
-    add(previous.x - 140, previous.y - 65);
+    for (const distance of [escapeDistance * .75, escapeDistance, escapeDistance * 1.12]) {
+      for (let n = 0; n < 16; n++) add(previous.x + Math.cos(n * Math.PI / 8) * distance, previous.y + Math.sin(n * Math.PI / 8) * distance);
+    }
   }
   let best = null;
   let bestScore = -Infinity;
   for (const candidate of candidates) {
     const overlapCount = obstacles.filter(obstacle => overlaps(candidate, obstacle, 12)).length;
     if (overlapCount) continue;
+    // A conservative swept rectangle keeps the moving button away from Yes.
+    if (previous && pathObstacles.length) {
+      const swept = { x: Math.min(previous.x, candidate.x), y: Math.min(previous.y, candidate.y), width: Math.abs(previous.x - candidate.x) + size.width, height: Math.abs(previous.y - candidate.y) + size.height };
+      if (pathObstacles.some(obstacle => overlaps(swept, obstacle, 8))) continue;
+    }
     const pointerDistance = pointer ? Math.hypot(candidate.x + size.width / 2 - pointer.x, candidate.y + size.height / 2 - pointer.y) : 160;
     const movedDistance = previous ? Math.hypot(candidate.x - previous.x, candidate.y - previous.y) : 160;
-    const score = -overlapCount * 100000 + Math.min(pointerDistance, 350) + Math.min(movedDistance, 240) + random() * 160;
+    const score = Math.min(pointerDistance, escapeDistance + 70) * 1.1 - Math.abs(movedDistance - escapeDistance) * .6 - Math.max(0, movedDistance - escapeDistance * 1.15) * 3 + random() * 25;
     if (score > bestScore) { best = candidate; bestScore = score; }
   }
   return best ? { x: best.x, y: best.y } : null;

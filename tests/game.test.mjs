@@ -88,3 +88,35 @@ test('impossible geometry returns a bounded no-fit signal instead of covering co
   const result = pickPosition({ viewport, size: { width: 180, height: 52 }, obstacles: [viewport], random: () => .5 });
   assert.equal(result, null);
 });
+
+test('travel and landing pause prevent repeated escapes while retaining the gesture guard', () => {
+  const state = new InvitationState();
+  assert.equal(state.attempt(1000), true);
+  state.pauseAttemptsUntil(1000 + CHAOS.travelDuration + CHAOS.landingPause);
+  assert.equal(state.pointerDown('no', 1300), false);
+  assert.equal(state.noKey('Enter', false, 1350), false);
+  assert.equal(state.accept(1), false);
+  assert.equal(state.attempts, 1);
+  assert.equal(state.noKey(' ', false, 2000), true);
+  assert.equal(state.attempts, 2);
+});
+
+test('escapes travel much farther from the pointer without sweeping across Yes', () => {
+  const viewport = { x: 0, y: 0, width: 1440, height: 800 };
+  const size = { width: 85, height: 52 };
+  const previous = { x: 500, y: 450 };
+  const yes = { x: 280, y: 440, width: 190, height: 65 };
+  for (let n = 0; n < 100; n++) {
+    const position = pickPosition({ viewport, size, previous, obstacles: [yes], pathObstacles: [yes], pointer: { x: 540, y: 476 } });
+    assert.ok(position);
+    const distance = Math.hypot(position.x - previous.x, position.y - previous.y);
+    assert.ok(distance >= 350 && distance <= 575);
+    const swept = { x: Math.min(previous.x, position.x), y: Math.min(previous.y, position.y), width: Math.abs(previous.x - position.x) + size.width, height: Math.abs(previous.y - position.y) + size.height };
+    assert.equal(overlaps(swept, yes, 8), false);
+  }
+});
+
+test('scroll and resize corrections retain an already safe visible position', () => {
+  const previous = { x: 250, y: 420 };
+  assert.deepEqual(pickPosition({ viewport: { x: 0, y: 0, width: 700, height: 600 }, size: { width: 85, height: 52 }, previous, preferPrevious: true }), previous);
+});

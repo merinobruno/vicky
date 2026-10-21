@@ -10,13 +10,17 @@ const lifetime = new AbortController();
 let lastPointer = null;
 let resizeFrame = 0;
 let animationFrame = 0;
+let noTravel = null;
 let clearConfetti = () => {};
 const on = (target, type, listener, options = {}) => target.addEventListener(type, listener, { ...options, signal: lifetime.signal });
 const later = (fn, delay) => { const id = setTimeout(() => { timers.delete(id); fn(); }, delay); timers.add(id); return id; };
 const rect = element => { const r = element.getBoundingClientRect(); return { x: r.left, y: r.top, width: r.width, height: r.height }; };
 
 $('discord-link').href = DISCORD_INVITE_URL;
-function syncMotion() { document.body.classList.toggle('reduced-motion', reducedMotion.matches); }
+function syncMotion() {
+  document.body.classList.toggle('reduced-motion', reducedMotion.matches);
+  if (reducedMotion.matches && noTravel) noTravel.finish();
+}
 syncMotion();
 on(reducedMotion, 'change', syncMotion);
 
@@ -32,32 +36,49 @@ function usableViewport() {
   };
 }
 
-function moveNo(pointer = lastPointer) {
+function moveNo(pointer = lastPointer, { animate = true, from = rect(no), preservePosition = false } = {}) {
   if (state.accepted) return;
-  const previous = rect(no);
+  const previous = from;
+  if (noTravel) { noTravel.cancel(); noTravel = null; }
+  no.classList.remove('is-moving', 'just-landed');
+  // Preserve the initial inline location before changing the positioning mode.
+  no.style.setProperty('--no-x', `${previous.x}px`);
+  no.style.setProperty('--no-y', `${previous.y}px`);
   no.classList.add('is-loose');
   const viewport = usableViewport();
   const obstacles = [yes, $('question'), $('face-zone'), document.querySelector('.site-header'), $('speech'), $('discord-link')]
     .filter(element => !element.hidden).map(rect);
   let size = { width: no.offsetWidth, height: no.offsetHeight };
-  let position = pickPosition({ viewport, size, obstacles, pointer, previous });
+  const pathObstacles = animate && !reducedMotion.matches ? [rect(yes)] : [];
+  let position = pickPosition({ viewport, size, obstacles, pathObstacles, pointer, previous, preferPrevious: preservePosition });
   if (!position) {
     no.textContent = 'No';
     no.classList.add('is-compact');
     size = { width: no.offsetWidth, height: no.offsetHeight };
-    position = pickPosition({ viewport, size, obstacles, pointer, previous });
+    position = pickPosition({ viewport, size, obstacles, pathObstacles, pointer, previous, preferPrevious: preservePosition });
   }
   if (!position || document.body.classList.contains('escape-docked')) {
     // Extremely short viewports get a dedicated strip; the page remains scrollable above it.
     document.body.classList.add('escape-docked');
     position = { x: viewport.x + 16 + Math.random() * Math.max(0, viewport.width - size.width - 32), y: viewport.y + viewport.height - size.height - 16 };
+    animate = false;
   }
   no.style.setProperty('--no-x', `${position.x}px`);
   no.style.setProperty('--no-y', `${position.y}px`);
-  if (!reducedMotion.matches) {
-    no.classList.remove('dodge');
-    void no.offsetWidth;
-    no.classList.add('dodge');
+  if (animate && !reducedMotion.matches && Math.hypot(previous.x - position.x, previous.y - position.y) > 3) {
+    no.classList.add('is-moving');
+    state.pauseAttemptsUntil(performance.now() + CHAOS.travelDuration + CHAOS.landingPause);
+    noTravel = no.animate([
+      { transform: `translate(${previous.x - position.x}px, ${previous.y - position.y}px)` },
+      { transform: 'translate(0, 0)' }
+    ], { duration: CHAOS.travelDuration, easing: 'cubic-bezier(.3, .05, .25, 1)' });
+    noTravel.onfinish = () => {
+      noTravel = null;
+      no.classList.remove('is-moving');
+      if (!state.accepted) no.classList.add('just-landed');
+    };
+  } else {
+    no.classList.add('just-landed');
   }
 }
 
@@ -103,7 +124,7 @@ function renderAttempt() {
   no.classList.toggle('is-error', stage === 4 && state.attempts % 3 === 1);
   no.setAttribute('aria-label', `${no.textContent}. Try to decline the invitation`);
   makeEffects(previous);
-  moveNo();
+  moveNo(lastPointer, { from: previous });
   const scene = $('character-scene');
   scene.classList.remove('react');
   yes.classList.remove('pulse');
@@ -149,7 +170,7 @@ on(yes, 'click', event => {
 
 function scheduleReposition() {
   if (!no.classList.contains('is-loose') || state.accepted || resizeFrame) return;
-  resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; moveNo(null); });
+  resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; moveNo(null, { animate: false, preservePosition: true }); });
 }
 on(window, 'resize', scheduleReposition);
 on(window, 'orientationchange', scheduleReposition);
@@ -210,6 +231,7 @@ function confetti() {
 }
 
 function celebrate() {
+  if (noTravel) { noTravel.cancel(); noTravel = null; }
   document.body.classList.add('accepted');
   document.body.dataset.accepted = 'true';
   $('actions').hidden = true;
@@ -230,6 +252,7 @@ function celebrate() {
 on(window, 'pagehide', () => {
   timers.forEach(clearTimeout); timers.clear();
   cancelAnimationFrame(resizeFrame); clearConfetti(); lifetime.abort();
+  if (noTravel) noTravel.cancel();
 });
 // A restored back/forward-cache page should be a fresh invitation, not a frozen celebration.
 window.addEventListener('pageshow', event => { if (event.persisted) window.location.reload(); });
